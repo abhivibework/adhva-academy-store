@@ -1,4 +1,5 @@
 import type { PaymentProvider } from "@prisma/client";
+import { connection } from "next/server";
 import { prisma } from "@/lib/prisma";
 
 const defaults = {
@@ -13,6 +14,7 @@ const defaults = {
 };
 
 export async function getSettings() {
+  await connection();
   try {
     const row = await prisma.settings.findUnique({ where: { id: "default" } });
     return row ?? defaults;

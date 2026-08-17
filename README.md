@@ -28,7 +28,8 @@ Open [http://localhost:3000](http://localhost:3000). Sign in with the admin emai
 
 | Variable | Purpose |
 | --- | --- |
-| `DATABASE_URL` | PostgreSQL connection string |
+| `DATABASE_URL` | PostgreSQL connection string (pooled URL is fine on Vercel/Neon) |
+| `DIRECT_DATABASE_URL` | Direct (non-pooled) Postgres URL for migrations. On Vercel this is filled from `POSTGRES_URL_NON_POOLING` if unset. |
 | `AUTH_SECRET` | Auth.js session secret |
 | `APP_URL` | Public site URL (webhooks, download redirects, Cashfree return) |
 | `ADMIN_EMAIL` / `ADMIN_PASSWORD` | Seeded admin account |
@@ -57,10 +58,10 @@ Repo: [github.com/abhivibework/adhva-academy-store](https://github.com/abhivibew
 Vercel is the better host for this store: 85 MB PDFs cannot live on the serverless disk, so product files go to **Vercel Blob**.
 
 1. Import the GitHub repo into [Vercel](https://vercel.com/new).
-2. Add a Postgres database (Neon from the Vercel marketplace is the usual choice) and set `DATABASE_URL`.
-3. Create a **Blob** store in the project Storage tab. That sets `BLOB_READ_WRITE_TOKEN`.
+2. **Storage → Create Database → Postgres (Neon)**. Vercel usually sets `POSTGRES_URL` / `POSTGRES_URL_NON_POOLING`; the build maps those to Prisma. You can also set `DATABASE_URL` yourself.
+3. **Storage → Blob**. That sets `BLOB_READ_WRITE_TOKEN`.
 4. Set `AUTH_SECRET`, `ADMIN_EMAIL`, `ADMIN_PASSWORD`, and `APP_URL` to the `*.vercel.app` URL.
-5. Deploy. The Vercel build runs migrations and seeds the admin user.
+5. Redeploy. The build runs migrations and seeds the admin user.
 
 After the first deploy, register Razorpay/Cashfree webhooks at `{APP_URL}/api/webhooks/razorpay` and `{APP_URL}/api/webhooks/cashfree`.
 
