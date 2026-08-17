@@ -51,10 +51,10 @@ Physical books can be created in Admin but stay off the storefront and cannot be
 
 ## Deploy on Render
 
-Repo: [github.com/abhiwebsite-ui/adhva-academy-store](https://github.com/abhiwebsite-ui/adhva-academy-store)
+Repo: [github.com/abhivibework/adhva-academy-store](https://github.com/abhivibework/adhva-academy-store)
 
 1. Restore billing on the **Adhvaacademy.in** Render workspace if services are suspended.
-2. Connect the GitHub account that owns this repo to Render.
+2. Connect GitHub account **abhivibework** to Render.
 3. Create a Blueprint from `render.yaml`, or create a Singapore **Postgres** instance plus a **Node** web service:
    - Build: `npm install && npx prisma generate && npm run build`
    - Start: `npx prisma migrate deploy && npx prisma db seed && npx next start --port $PORT`
