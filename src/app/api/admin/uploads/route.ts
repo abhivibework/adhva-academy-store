@@ -1,8 +1,13 @@
 import { NextResponse } from "next/server";
 import { getAdminUser } from "@/lib/auth-guard";
-import { saveUpload } from "@/lib/uploads";
+import { writeUploadChunk } from "@/lib/uploads";
 
 export const maxDuration = 60;
+
+function integerParam(value: string | null) {
+  if (value == null || value === "") return Number.NaN;
+  return Number(value);
+}
 
 export async function POST(request: Request) {
   const admin = await getAdminUser();
@@ -10,20 +15,28 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: "Sign in as admin to upload." }, { status: 401 });
   }
 
-  const formData = await request.formData();
-  const kindRaw = String(formData.get("kind") ?? "");
-  const kind = kindRaw === "covers" || kindRaw === "files" ? kindRaw : null;
-  const file = formData.get("file");
+  if (!request.body) {
+    return NextResponse.json({ error: "Choose a file to upload." }, { status: 400 });
+  }
 
-  if (!kind || !(file instanceof File)) {
+  const url = new URL(request.url);
+  const kindRaw = url.searchParams.get("kind");
+  const kind = kindRaw === "covers" || kindRaw === "files" ? kindRaw : null;
+  if (!kind) {
     return NextResponse.json({ error: "Choose a file to upload." }, { status: 400 });
   }
 
   try {
-    const saved = await saveUpload(file, kind, { imageOnly: kind === "covers" });
-    if (!saved) {
-      return NextResponse.json({ error: "The file was empty." }, { status: 400 });
-    }
+    const saved = await writeUploadChunk({
+      kind,
+      uploadId: String(url.searchParams.get("uploadId") ?? ""),
+      chunkIndex: integerParam(url.searchParams.get("chunkIndex")),
+      chunkCount: integerParam(url.searchParams.get("chunkCount")),
+      fileName: String(url.searchParams.get("fileName") ?? ""),
+      fileType: String(url.searchParams.get("fileType") ?? ""),
+      totalSize: integerParam(url.searchParams.get("totalSize")),
+      body: request.body,
+    });
     return NextResponse.json(saved);
   } catch (error) {
     const message = error instanceof Error ? error.message : "Could not upload file.";

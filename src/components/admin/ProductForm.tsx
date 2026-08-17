@@ -10,6 +10,7 @@ import {
 import { paiseToRupeeInput } from "@/lib/money";
 import { isDigitalType } from "@/lib/products";
 import {
+  CHUNK_SIZE_BYTES,
   COVER_MAX_BYTES,
   FILE_MAX_BYTES,
   formatMaxSize,
@@ -21,22 +22,71 @@ const types: { value: ProductType; label: string }[] = [
   { value: "PHYSICAL_BOOK", label: "Book (hardcopy)" },
 ];
 
-async function uploadAdminFile(file: File, kind: "covers" | "files") {
-  const body = new FormData();
-  body.set("kind", kind);
-  body.set("file", file);
-  const response = await fetch("/api/admin/uploads", {
-    method: "POST",
-    body,
-    credentials: "include",
+function newUploadId() {
+  return Array.from(crypto.getRandomValues(new Uint8Array(16)))
+    .map((byte) => byte.toString(16).padStart(2, "0"))
+    .join("");
+}
+
+async function postChunk(
+  file: File,
+  kind: "covers" | "files",
+  uploadId: string,
+  chunkIndex: number,
+  chunkCount: number,
+  blob: Blob,
+) {
+  const params = new URLSearchParams({
+    kind,
+    uploadId,
+    chunkIndex: String(chunkIndex),
+    chunkCount: String(chunkCount),
+    fileName: file.name,
+    fileType: file.type,
+    totalSize: String(file.size),
   });
-  const payload = (await response.json().catch(() => null)) as
-    | { relative?: string; originalName?: string; error?: string }
-    | null;
-  if (!response.ok || !payload?.relative) {
-    throw new Error(payload?.error ?? "Could not upload file. Try a smaller file.");
+
+  let lastError = "Could not upload file.";
+  for (let attempt = 0; attempt < 3; attempt += 1) {
+    const response = await fetch(`/api/admin/uploads?${params}`, {
+      method: "POST",
+      credentials: "include",
+      headers: { "Content-Type": "application/octet-stream" },
+      body: blob,
+    });
+    const payload = (await response.json().catch(() => null)) as
+      | { relative?: string; originalName?: string; error?: string; done?: boolean }
+      | null;
+    if (response.ok) return payload;
+    lastError = payload?.error ?? lastError;
   }
-  return { relative: payload.relative, originalName: payload.originalName ?? file.name };
+  throw new Error(lastError);
+}
+
+async function uploadAdminFile(
+  file: File,
+  kind: "covers" | "files",
+  onProgress: (label: string) => void,
+) {
+  const uploadId = newUploadId();
+  const chunkCount = Math.max(1, Math.ceil(file.size / CHUNK_SIZE_BYTES));
+  const label = kind === "covers" ? "cover" : "file";
+  let saved: { relative?: string; originalName?: string } | null = null;
+
+  for (let index = 0; index < chunkCount; index += 1) {
+    onProgress(
+      chunkCount === 1
+        ? `Uploading ${label}…`
+        : `Uploading ${label} ${index + 1}/${chunkCount}…`,
+    );
+    const blob = file.slice(index * CHUNK_SIZE_BYTES, Math.min(file.size, (index + 1) * CHUNK_SIZE_BYTES));
+    saved = await postChunk(file, kind, uploadId, index, chunkCount, blob);
+  }
+
+  if (!saved?.relative) {
+    throw new Error("Upload did not finish. Try again.");
+  }
+  return { relative: saved.relative, originalName: saved.originalName ?? file.name };
 }
 
 export function ProductForm({ product }: { product?: Product }) {
@@ -49,6 +99,7 @@ export function ProductForm({ product }: { product?: Product }) {
   );
   const [type, setType] = useState<ProductType>(product?.type ?? "COURSE");
   const [uploading, setUploading] = useState(false);
+  const [uploadLabel, setUploadLabel] = useState("Uploading files…");
   const [clientError, setClientError] = useState<string | null>(null);
   const digital = useMemo(() => isDigitalType(type), [type]);
   const busy = pending || uploading;
@@ -68,13 +119,14 @@ export function ProductForm({ product }: { product?: Product }) {
     }
 
     setUploading(true);
+    setUploadLabel("Uploading files…");
     try {
       if (cover instanceof File && cover.size > 0) {
-        const saved = await uploadAdminFile(cover, "covers");
+        const saved = await uploadAdminFile(cover, "covers", setUploadLabel);
         formData.set("uploadedCover", saved.relative);
       }
       if (file instanceof File && file.size > 0) {
-        const saved = await uploadAdminFile(file, "files");
+        const saved = await uploadAdminFile(file, "files", setUploadLabel);
         formData.set("uploadedFile", saved.relative);
         formData.set("uploadedFileName", saved.originalName);
       }
@@ -178,8 +230,9 @@ export function ProductForm({ product }: { product?: Product }) {
           </span>
           <input name="file" type="file" className="mt-2 w-full text-sm" />
           <p className="mt-1 text-sm text-muted">
-            Buyers receive a signed download after payment. Maximum{" "}
-            {formatMaxSize(FILE_MAX_BYTES)} so the server does not run out of memory.
+            PDF, JPG, ZIP, and other course files. Maximum{" "}
+            {formatMaxSize(FILE_MAX_BYTES)}. Large files upload in small pieces so
+            the site stays up.
           </p>
           {product?.fileName ? (
             <p className="mt-1 text-sm text-muted">Current: {product.fileName}</p>
@@ -239,7 +292,7 @@ export function ProductForm({ product }: { product?: Product }) {
         disabled={busy}
         className="bg-foreground px-6 py-3 text-sm tracking-wide text-paper hover:bg-gold-dark disabled:opacity-60"
       >
-        {uploading ? "Uploading files…" : pending ? "Saving…" : product ? "Save changes" : "Create product"}
+        {uploading ? uploadLabel : pending ? "Saving…" : product ? "Save changes" : "Create product"}
       </button>
     </form>
   );

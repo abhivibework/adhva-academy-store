@@ -44,5 +44,7 @@ next-env.d.ts
 # uploaded product covers and digital files
 /uploads/covers/*
 /uploads/files/*
+/uploads/tmp/*
 !/uploads/covers/.gitkeep
 !/uploads/files/.gitkeep
+!/uploads/tmp/.gitkeep
