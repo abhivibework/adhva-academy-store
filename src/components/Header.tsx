@@ -52,6 +52,9 @@ export async function Header() {
           </Link>
           {session?.user ? (
             <>
+              <Link href="/account" className="text-foreground/80 hover:text-gold-dark">
+                Account
+              </Link>
               <Link href="/orders" className="text-foreground/80 hover:text-gold-dark">
                 My orders
               </Link>

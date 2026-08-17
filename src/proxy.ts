@@ -7,6 +7,7 @@ export const proxy = auth((req) => {
   const isProtected =
     isAdmin ||
     pathname.startsWith("/orders") ||
+    pathname.startsWith("/account") ||
     pathname === "/cart" ||
     pathname.startsWith("/checkout");
 
@@ -28,5 +29,13 @@ export const proxy = auth((req) => {
 });
 
 export const config = {
-  matcher: ["/admin/:path*", "/orders/:path*", "/cart", "/checkout", "/checkout/:path*"],
+  matcher: [
+    "/admin/:path*",
+    "/orders/:path*",
+    "/account",
+    "/account/:path*",
+    "/cart",
+    "/checkout",
+    "/checkout/:path*",
+  ],
 };

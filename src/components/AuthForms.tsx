@@ -2,7 +2,13 @@
 
 import { useActionState } from "react";
 import Link from "next/link";
-import { loginAction, registerAction, type AuthState } from "@/app/actions/auth";
+import {
+  changePasswordAction,
+  loginAction,
+  registerAction,
+  type AuthState,
+  type ChangePasswordState,
+} from "@/app/actions/auth";
 
 function Field({
   label,
@@ -84,6 +90,45 @@ export function RegisterForm() {
           Sign in
         </Link>
       </p>
+    </form>
+  );
+}
+
+export function ChangePasswordForm() {
+  const [state, action, pending] = useActionState<ChangePasswordState, FormData>(
+    changePasswordAction,
+    null,
+  );
+
+  return (
+    <form action={action} className="max-w-xl space-y-5">
+      <Field
+        label="Current password"
+        name="currentPassword"
+        type="password"
+        autoComplete="current-password"
+      />
+      <Field
+        label="New password"
+        name="newPassword"
+        type="password"
+        autoComplete="new-password"
+      />
+      <Field
+        label="Confirm new password"
+        name="confirmPassword"
+        type="password"
+        autoComplete="new-password"
+      />
+      {state?.error ? <p className="text-sm text-red-700">{state.error}</p> : null}
+      {state?.ok ? <p className="text-sm text-gold-dark">Password updated.</p> : null}
+      <button
+        type="submit"
+        disabled={pending}
+        className="bg-foreground px-6 py-3 text-sm tracking-wide text-paper hover:bg-gold-dark disabled:opacity-60"
+      >
+        {pending ? "Updating…" : "Change password"}
+      </button>
     </form>
   );
 }

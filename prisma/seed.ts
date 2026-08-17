@@ -11,13 +11,21 @@ async function main() {
     throw new Error("Set ADMIN_EMAIL and ADMIN_PASSWORD before seeding.");
   }
 
-  const passwordHash = await hash(password, 12);
-
-  await prisma.user.upsert({
-    where: { email },
-    update: { role: "ADMIN", passwordHash },
-    create: { email, passwordHash, role: "ADMIN" },
-  });
+  const existingAdmin = await prisma.user.findUnique({ where: { email } });
+  if (existingAdmin) {
+    await prisma.user.update({
+      where: { email },
+      data: { role: "ADMIN" },
+    });
+  } else {
+    await prisma.user.create({
+      data: {
+        email,
+        passwordHash: await hash(password, 12),
+        role: "ADMIN",
+      },
+    });
+  }
 
   await prisma.settings.upsert({
     where: { id: "default" },

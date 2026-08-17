@@ -1,4 +1,5 @@
 import type { Metadata } from "next";
+import { ChangePasswordForm } from "@/components/AuthForms";
 import { SettingsForm } from "@/components/admin/SettingsForm";
 import { prisma } from "@/lib/prisma";
 import { cashfreeConfigured, razorpayConfigured } from "@/lib/settings";
@@ -33,6 +34,14 @@ export default async function AdminSettingsPage() {
         </li>
       </ul>
       <SettingsForm settings={settings} />
+
+      <section className="mt-16 max-w-xl border-t border-line pt-10">
+        <h2 className="font-serif text-2xl">Your password</h2>
+        <p className="mt-2 mb-6 text-sm text-muted">
+          Change the password you use to sign in to admin.
+        </p>
+        <ChangePasswordForm />
+      </section>
     </div>
   );
 }

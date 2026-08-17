@@ -20,7 +20,7 @@ npx prisma db seed
 npm run dev
 ```
 
-`prisma db seed` creates the admin account and default site settings only — it does not add products.
+`prisma db seed` creates the admin account (from `ADMIN_EMAIL` / `ADMIN_PASSWORD`) and default site settings only — it does not add products. Later seeds keep an existing admin’s password; change it in Account or Admin → Settings.
 
 Open [http://localhost:3000](http://localhost:3000). Sign in with the admin email, then use `/admin` to add listed digital products (with a download file) before they appear in the catalogue.
 
