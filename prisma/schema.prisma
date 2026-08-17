@@ -1,0 +1,124 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+enum Role {
+  CUSTOMER
+  ADMIN
+}
+
+enum ProductType {
+  COURSE
+  DIGITAL_BOOK
+  PHYSICAL_BOOK
+}
+
+enum OrderStatus {
+  PENDING
+  PAID
+  FAILED
+  FULFILLED
+}
+
+enum PaymentProvider {
+  RAZORPAY
+  CASHFREE
+}
+
+model User {
+  id           String     @id @default(cuid())
+  email        String     @unique
+  passwordHash String
+  phone        String?
+  role         Role       @default(CUSTOMER)
+  createdAt    DateTime   @default(now())
+  updatedAt    DateTime   @updatedAt
+  cartItems    CartItem[]
+  orders       Order[]
+}
+
+model Product {
+  id                String      @id @default(cuid())
+  type              ProductType
+  title             String
+  slug              String      @unique
+  description       String      @db.Text
+  priceInPaise      Int
+  isListed          Boolean     @default(false)
+  isDigital         Boolean
+  stockQty          Int         @default(0)
+  lowStockThreshold Int         @default(5)
+  archivedAt        DateTime?
+  coverPath         String?
+  filePath          String?
+  fileName          String?
+  createdAt         DateTime    @default(now())
+  updatedAt         DateTime    @updatedAt
+  cartItems         CartItem[]
+  orderItems        OrderItem[]
+}
+
+model CartItem {
+  id        String  @id @default(cuid())
+  userId    String
+  productId String
+  qty       Int     @default(1)
+  user      User    @relation(fields: [userId], references: [id], onDelete: Cascade)
+  product   Product @relation(fields: [productId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, productId])
+}
+
+model Order {
+  id                String           @id @default(cuid())
+  userId            String
+  status            OrderStatus      @default(PENDING)
+  amountInPaise     Int
+  paymentProvider   PaymentProvider?
+  razorpayOrderId   String?          @unique
+  razorpayPaymentId String?
+  cashfreeOrderId   String?          @unique
+  cashfreePaymentId String?
+  createdAt         DateTime         @default(now())
+  updatedAt         DateTime         @updatedAt
+  user              User             @relation(fields: [userId], references: [id], onDelete: Restrict)
+  items             OrderItem[]
+}
+
+model OrderItem {
+  id             String          @id @default(cuid())
+  orderId        String
+  productId      String
+  title          String
+  priceInPaise   Int
+  qty            Int
+  order          Order           @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  product        Product         @relation(fields: [productId], references: [id], onDelete: Restrict)
+  downloadTokens DownloadToken[]
+}
+
+model DownloadToken {
+  id          String    @id @default(cuid())
+  orderItemId String
+  token       String    @unique
+  expiresAt   DateTime
+  createdAt   DateTime  @default(now())
+  orderItem   OrderItem @relation(fields: [orderItemId], references: [id], onDelete: Cascade)
+}
+
+model Settings {
+  id               String          @id @default("default")
+  siteName         String          @default("Adhva Academy")
+  tagline          String          @default("The Learning Path")
+  contactEmail     String          @default("")
+  footerText       String          @default("Adhva Academy — The Learning Path")
+  razorpayEnabled  Boolean         @default(true)
+  cashfreeEnabled  Boolean         @default(false)
+  defaultGateway   PaymentProvider @default(RAZORPAY)
+  updatedAt        DateTime        @updatedAt
+}
