@@ -5,6 +5,7 @@ import { NextResponse } from "next/server";
 import { auth } from "@/auth";
 import { prisma } from "@/lib/prisma";
 import { isStorefrontProduct } from "@/lib/products";
+import { isBlobUrl } from "@/lib/storage";
 import { absoluteUploadPath } from "@/lib/uploads";
 
 export async function GET(
@@ -21,6 +22,10 @@ export async function GET(
   const isAdmin = session?.user?.role === "ADMIN";
   if (!isStorefrontProduct(product) && !isAdmin) {
     return NextResponse.json({ error: "Not found." }, { status: 404 });
+  }
+
+  if (isBlobUrl(product.coverPath)) {
+    return NextResponse.redirect(product.coverPath);
   }
 
   const filePath = absoluteUploadPath(product.coverPath);

@@ -10,7 +10,8 @@ import { prisma } from "@/lib/prisma";
 import { isDigitalType } from "@/lib/products";
 import { access } from "fs/promises";
 import { uniqueSlug } from "@/lib/slug";
-import { absoluteUploadPath, isOwnedUploadPath, removeUpload } from "@/lib/uploads";
+import { isBlobUrl, isStoredUpload, removeStoredUpload } from "@/lib/storage";
+import { absoluteUploadPath } from "@/lib/uploads";
 
 const productSchema = z.object({
   title: z.string().trim().min(1, "Title is required."),
@@ -60,7 +61,7 @@ async function parseProductForm(formData: FormData) {
 function readUploadedPath(formData: FormData, field: string, kind: "covers" | "files") {
   const value = String(formData.get(field) ?? "").trim();
   if (!value) return null;
-  if (!isOwnedUploadPath(value, kind)) {
+  if (!isStoredUpload(value, kind)) {
     throw new Error("Invalid upload.");
   }
   return value;
@@ -69,6 +70,7 @@ function readUploadedPath(formData: FormData, field: string, kind: "covers" | "f
 async function requireUploadedPath(formData: FormData, field: string, kind: "covers" | "files") {
   const relative = readUploadedPath(formData, field, kind);
   if (!relative) return null;
+  if (isBlobUrl(relative)) return relative;
   try {
     await access(absoluteUploadPath(relative));
   } catch {
@@ -175,9 +177,9 @@ export async function updateProductAction(
       },
     });
 
-    if (coverPath && existing.coverPath) await removeUpload(existing.coverPath);
-    if (filePath && existing.filePath) await removeUpload(existing.filePath);
-    if (!data.isDigital && existing.filePath) await removeUpload(existing.filePath);
+    if (coverPath && existing.coverPath) await removeStoredUpload(existing.coverPath);
+    if (filePath && existing.filePath) await removeStoredUpload(existing.filePath);
+    if (!data.isDigital && existing.filePath) await removeStoredUpload(existing.filePath);
   } catch (error) {
     return { error: error instanceof Error ? error.message : "Could not update product." };
   }

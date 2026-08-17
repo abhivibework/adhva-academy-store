@@ -9,6 +9,7 @@ import {
 } from "@/app/actions/admin-products";
 import { paiseToRupeeInput } from "@/lib/money";
 import { isDigitalType } from "@/lib/products";
+import { upload } from "@vercel/blob/client";
 import {
   CHUNK_SIZE_BYTES,
   COVER_MAX_BYTES,
@@ -67,10 +68,25 @@ async function uploadAdminFile(
   file: File,
   kind: "covers" | "files",
   onProgress: (label: string) => void,
+  useBlob: boolean,
 ) {
+  const label = kind === "covers" ? "cover" : "file";
+  if (useBlob) {
+    onProgress(`Uploading ${label}…`);
+    const blob = await upload(`${kind}/${file.name}`, file, {
+      access: kind === "covers" ? "public" : "private",
+      handleUploadUrl: "/api/admin/blob",
+      clientPayload: JSON.stringify({ kind }),
+      multipart: file.size > 8 * 1024 * 1024,
+      onUploadProgress({ percentage }) {
+        onProgress(`Uploading ${label} ${Math.min(99, Math.round(percentage))}%…`);
+      },
+    });
+    return { relative: blob.url, originalName: file.name };
+  }
+
   const uploadId = newUploadId();
   const chunkCount = Math.max(1, Math.ceil(file.size / CHUNK_SIZE_BYTES));
-  const label = kind === "covers" ? "cover" : "file";
   let saved: { relative?: string; originalName?: string } | null = null;
 
   for (let index = 0; index < chunkCount; index += 1) {
@@ -89,7 +105,13 @@ async function uploadAdminFile(
   return { relative: saved.relative, originalName: saved.originalName ?? file.name };
 }
 
-export function ProductForm({ product }: { product?: Product }) {
+export function ProductForm({
+  product,
+  useBlob = false,
+}: {
+  product?: Product;
+  useBlob?: boolean;
+}) {
   const action = product
     ? updateProductAction.bind(null, product.id)
     : createProductAction;
@@ -122,11 +144,11 @@ export function ProductForm({ product }: { product?: Product }) {
     setUploadLabel("Uploading files…");
     try {
       if (cover instanceof File && cover.size > 0) {
-        const saved = await uploadAdminFile(cover, "covers", setUploadLabel);
+        const saved = await uploadAdminFile(cover, "covers", setUploadLabel, useBlob);
         formData.set("uploadedCover", saved.relative);
       }
       if (file instanceof File && file.size > 0) {
-        const saved = await uploadAdminFile(file, "files", setUploadLabel);
+        const saved = await uploadAdminFile(file, "files", setUploadLabel, useBlob);
         formData.set("uploadedFile", saved.relative);
         formData.set("uploadedFileName", saved.originalName);
       }

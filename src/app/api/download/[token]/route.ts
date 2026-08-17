@@ -3,10 +3,12 @@ import { stat } from "node:fs/promises";
 import { Readable } from "node:stream";
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
+import { isBlobUrl, signedBlobDownloadUrl } from "@/lib/storage";
 import { absoluteUploadPath } from "@/lib/uploads";
 
 export const dynamic = "force-dynamic";
 export const runtime = "nodejs";
+export const maxDuration = 60;
 
 function contentDisposition(filename: string) {
   const safe = filename.replace(/["\r\n]/g, "");
@@ -38,6 +40,11 @@ export async function GET(
   }
   if (!product.filePath) {
     return NextResponse.json({ error: "File is not available." }, { status: 404 });
+  }
+
+  if (isBlobUrl(product.filePath)) {
+    const url = await signedBlobDownloadUrl(product.filePath, "private");
+    return NextResponse.redirect(url);
   }
 
   const filePath = absoluteUploadPath(product.filePath);

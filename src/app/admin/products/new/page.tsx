@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import Link from "next/link";
 import { ProductForm } from "@/components/admin/ProductForm";
+import { blobConfigured } from "@/lib/storage";
 
 export const metadata: Metadata = {
   title: "New product",
@@ -18,7 +19,7 @@ export default function NewProductPage() {
       <p className="mt-2 mb-10 max-w-xl text-muted">
         Hardcopy books are saved unlisted and cannot be sold on the storefront yet.
       </p>
-      <ProductForm />
+      <ProductForm useBlob={blobConfigured()} />
     </div>
   );
 }

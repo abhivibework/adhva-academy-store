@@ -4,6 +4,7 @@ import { notFound } from "next/navigation";
 import { ArchiveProductButton } from "@/components/admin/ArchiveProductButton";
 import { ProductForm } from "@/components/admin/ProductForm";
 import { prisma } from "@/lib/prisma";
+import { blobConfigured } from "@/lib/storage";
 
 export const metadata: Metadata = {
   title: "Edit product",
@@ -35,7 +36,7 @@ export default async function EditProductPage({
           archived={Boolean(product.archivedAt)}
         />
       </div>
-      <ProductForm product={product} />
+      <ProductForm product={product} useBlob={blobConfigured()} />
     </div>
   );
 }

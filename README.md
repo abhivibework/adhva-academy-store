@@ -32,6 +32,7 @@ Open [http://localhost:3000](http://localhost:3000). Sign in with the admin emai
 | `AUTH_SECRET` | Auth.js session secret |
 | `APP_URL` | Public site URL (webhooks, download redirects, Cashfree return) |
 | `ADMIN_EMAIL` / `ADMIN_PASSWORD` | Seeded admin account |
+| `BLOB_READ_WRITE_TOKEN` | Vercel Blob store token. Required on Vercel so large PDFs and covers persist. |
 | `RAZORPAY_KEY_ID` / `RAZORPAY_KEY_SECRET` / `RAZORPAY_WEBHOOK_SECRET` | Razorpay INR checkout |
 | `CASHFREE_APP_ID` / `CASHFREE_SECRET_KEY` / `CASHFREE_WEBHOOK_SECRET` / `CASHFREE_ENV` | Cashfree PG (`sandbox` or `production`). Webhook HMAC uses `CASHFREE_WEBHOOK_SECRET` if set, otherwise `CASHFREE_SECRET_KEY`. |
 
@@ -49,9 +50,23 @@ Cashfree also returns buyers to `{APP_URL}/api/checkout/return?order_id={order_i
 
 Physical books can be created in Admin but stay off the storefront and cannot be sold at checkout.
 
-## Deploy on Render
+## Deploy on Vercel
 
 Repo: [github.com/abhivibework/adhva-academy-store](https://github.com/abhivibework/adhva-academy-store)
+
+Vercel is the better host for this store: 85 MB PDFs cannot live on the serverless disk, so product files go to **Vercel Blob**.
+
+1. Import the GitHub repo into [Vercel](https://vercel.com/new).
+2. Add a Postgres database (Neon from the Vercel marketplace is the usual choice) and set `DATABASE_URL`.
+3. Create a **Blob** store in the project Storage tab. That sets `BLOB_READ_WRITE_TOKEN`.
+4. Set `AUTH_SECRET`, `ADMIN_EMAIL`, `ADMIN_PASSWORD`, and `APP_URL` to the `*.vercel.app` URL.
+5. Deploy. The Vercel build runs migrations and seeds the admin user.
+
+After the first deploy, register Razorpay/Cashfree webhooks at `{APP_URL}/api/webhooks/razorpay` and `{APP_URL}/api/webhooks/cashfree`.
+
+## Deploy on Render
+
+The live Render service remains available, but large files are wiped on restart unless you attach a persistent disk **or** set `BLOB_READ_WRITE_TOKEN` there too.
 
 1. Restore billing on the **Adhvaacademy.in** Render workspace if services are suspended.
 2. Connect GitHub account **abhivibework** to Render.
