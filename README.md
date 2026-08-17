@@ -48,3 +48,17 @@ Register these in each provider dashboard after the app is publicly reachable (`
 Cashfree also returns buyers to `{APP_URL}/api/checkout/return?order_id={order_id}`.
 
 Physical books can be created in Admin but stay off the storefront and cannot be sold at checkout.
+
+## Deploy on Render
+
+Repo: [github.com/abhiwebsite-ui/adhva-academy-store](https://github.com/abhiwebsite-ui/adhva-academy-store)
+
+1. Restore billing on the **Adhvaacademy.in** Render workspace if services are suspended.
+2. Connect the GitHub account that owns this repo to Render.
+3. Create a Blueprint from `render.yaml`, or create a Singapore **Postgres** instance plus a **Node** web service:
+   - Build: `npm install && npx prisma generate && npm run build`
+   - Start: `npx prisma migrate deploy && npx prisma db seed && npx next start --port $PORT`
+4. Set `ADMIN_EMAIL`, `ADMIN_PASSWORD`, `AUTH_SECRET`, and `APP_URL` to the public `*.onrender.com` URL.
+5. After the first deploy, register Razorpay/Cashfree webhooks at `{APP_URL}/api/webhooks/razorpay` and `{APP_URL}/api/webhooks/cashfree`.
+
+Uploaded product files live on disk; add a Render persistent disk at `/opt/render/project/src/uploads` before selling real files, or they will be lost on redeploy.

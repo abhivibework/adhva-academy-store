@@ -1,0 +1,30 @@
+databases:
+  - name: adhva-store-db
+    plan: basic-256mb
+    region: singapore
+
+services:
+  - type: web
+    name: adhva-academy-store
+    runtime: node
+    plan: starter
+    region: singapore
+    buildCommand: npm install && npx prisma generate && npm run build
+    startCommand: npx prisma migrate deploy && npx prisma db seed && npx next start --port $PORT
+    envVars:
+      - key: NODE_VERSION
+        value: "20"
+      - key: DATABASE_URL
+        fromDatabase:
+          name: adhva-store-db
+          property: connectionString
+      - key: AUTH_SECRET
+        generateValue: true
+      - key: APP_URL
+        value: https://adhva-academy-store.onrender.com
+      - key: ADMIN_EMAIL
+        sync: false
+      - key: ADMIN_PASSWORD
+        sync: false
+      - key: CASHFREE_ENV
+        value: sandbox
