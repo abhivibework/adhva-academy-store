@@ -21,3 +21,9 @@ export async function requireAdmin() {
   }
   return user;
 }
+
+export async function getAdminUser() {
+  const user = await getSessionUser();
+  if (!user?.id || user.role !== "ADMIN") return null;
+  return user;
+}

@@ -1,6 +1,10 @@
 import { randomBytes } from "crypto";
-import { mkdir, unlink, writeFile } from "fs/promises";
+import { createWriteStream } from "fs";
+import { mkdir, unlink } from "fs/promises";
 import path from "path";
+import { Readable } from "stream";
+import { pipeline } from "stream/promises";
+import { COVER_MAX_BYTES, FILE_MAX_BYTES, formatMaxSize } from "@/lib/upload-limits";
 
 const COVER_TYPES = new Set([
   "image/jpeg",
@@ -8,6 +12,8 @@ const COVER_TYPES = new Set([
   "image/webp",
   "image/gif",
 ]);
+
+const OWNED_UPLOAD = /^(covers|files)\/[a-f0-9]{32}(\.[a-z0-9]{1,8})?$/;
 
 function extensionFor(file: File) {
   const fromName = path.extname(file.name).toLowerCase();
@@ -17,6 +23,15 @@ function extensionFor(file: File) {
   if (file.type === "image/webp") return ".webp";
   if (file.type === "application/pdf") return ".pdf";
   return "";
+}
+
+function originalName(file: File) {
+  const base = path.basename(file.name).replace(/[\r\n]/g, "").trim();
+  return base.slice(0, 180) || "download";
+}
+
+export function isOwnedUploadPath(relative: string, kind: "covers" | "files") {
+  return OWNED_UPLOAD.test(relative) && relative.startsWith(`${kind}/`);
 }
 
 export async function saveUpload(
@@ -29,14 +44,30 @@ export async function saveUpload(
     throw new Error("Cover must be a JPEG, PNG, WebP, or GIF image.");
   }
 
+  const maxBytes = options?.imageOnly ? COVER_MAX_BYTES : FILE_MAX_BYTES;
+  if (file.size > maxBytes) {
+    throw new Error(
+      `${kind === "covers" ? "Cover images" : "Digital files"} must be ${formatMaxSize(maxBytes)} or smaller.`,
+    );
+  }
+
   const dir = path.join(process.cwd(), "uploads", kind);
   await mkdir(dir, { recursive: true });
   const filename = `${randomBytes(16).toString("hex")}${extensionFor(file)}`;
   const relative = `${kind}/${filename}`;
-  const absolute = path.join(process.cwd(), "uploads", kind, filename);
-  const buffer = Buffer.from(await file.arrayBuffer());
-  await writeFile(absolute, buffer);
-  return { relative, originalName: file.name };
+  const absolute = path.join(dir, filename);
+
+  try {
+    await pipeline(
+      Readable.fromWeb(file.stream() as Parameters<typeof Readable.fromWeb>[0]),
+      createWriteStream(absolute),
+    );
+  } catch (error) {
+    await unlink(absolute).catch(() => undefined);
+    throw error;
+  }
+
+  return { relative, originalName: originalName(file) };
 }
 
 export function absoluteUploadPath(relative: string) {

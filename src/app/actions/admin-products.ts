@@ -8,8 +8,9 @@ import { requireAdmin } from "@/lib/auth-guard";
 import { rupeesToPaise } from "@/lib/money";
 import { prisma } from "@/lib/prisma";
 import { isDigitalType } from "@/lib/products";
+import { access } from "fs/promises";
 import { uniqueSlug } from "@/lib/slug";
-import { removeUpload, saveUpload } from "@/lib/uploads";
+import { absoluteUploadPath, isOwnedUploadPath, removeUpload } from "@/lib/uploads";
 
 const productSchema = z.object({
   title: z.string().trim().min(1, "Title is required."),
@@ -56,6 +57,33 @@ async function parseProductForm(formData: FormData) {
   };
 }
 
+function readUploadedPath(formData: FormData, field: string, kind: "covers" | "files") {
+  const value = String(formData.get(field) ?? "").trim();
+  if (!value) return null;
+  if (!isOwnedUploadPath(value, kind)) {
+    throw new Error("Invalid upload.");
+  }
+  return value;
+}
+
+async function requireUploadedPath(formData: FormData, field: string, kind: "covers" | "files") {
+  const relative = readUploadedPath(formData, field, kind);
+  if (!relative) return null;
+  try {
+    await access(absoluteUploadPath(relative));
+  } catch {
+    throw new Error("Uploaded file is missing. Try again.");
+  }
+  return relative;
+}
+
+function readUploadedFileName(formData: FormData) {
+  const value = String(formData.get("uploadedFileName") ?? "")
+    .replace(/[\r\n]/g, "")
+    .trim();
+  return value.slice(0, 180) || null;
+}
+
 export async function createProductAction(
   _prev: ProductFormState,
   formData: FormData,
@@ -64,12 +92,11 @@ export async function createProductAction(
 
   try {
     const data = await parseProductForm(formData);
-    const cover = formData.get("cover");
-    const file = formData.get("file");
-    const coverUpload =
-      cover instanceof File ? await saveUpload(cover, "covers", { imageOnly: true }) : null;
-    const fileUpload =
-      data.isDigital && file instanceof File ? await saveUpload(file, "files") : null;
+    const coverPath = await requireUploadedPath(formData, "uploadedCover", "covers");
+    const filePath = data.isDigital
+      ? await requireUploadedPath(formData, "uploadedFile", "files")
+      : null;
+    const fileName = filePath ? readUploadedFileName(formData) : null;
 
     const slug = await uniqueSlug(data.slug || data.title, async (candidate) => {
       const found = await prisma.product.findUnique({ where: { slug: candidate } });
@@ -87,9 +114,9 @@ export async function createProductAction(
         isDigital: data.isDigital,
         stockQty: data.stockQty,
         lowStockThreshold: data.lowStockThreshold,
-        coverPath: coverUpload?.relative,
-        filePath: fileUpload?.relative,
-        fileName: fileUpload?.originalName,
+        coverPath,
+        filePath,
+        fileName,
       },
     });
   } catch (error) {
@@ -115,12 +142,11 @@ export async function updateProductAction(
 
   try {
     const data = await parseProductForm(formData);
-    const cover = formData.get("cover");
-    const file = formData.get("file");
-    const coverUpload =
-      cover instanceof File ? await saveUpload(cover, "covers", { imageOnly: true }) : null;
-    const fileUpload =
-      data.isDigital && file instanceof File ? await saveUpload(file, "files") : null;
+    const coverPath = await requireUploadedPath(formData, "uploadedCover", "covers");
+    const filePath = data.isDigital
+      ? await requireUploadedPath(formData, "uploadedFile", "files")
+      : null;
+    const fileName = filePath ? readUploadedFileName(formData) : null;
 
     const requestedSlug = (data.slug || data.title).trim();
     let slug = existing.slug;
@@ -143,18 +169,14 @@ export async function updateProductAction(
         isDigital: data.isDigital,
         stockQty: data.stockQty,
         lowStockThreshold: data.lowStockThreshold,
-        coverPath: coverUpload?.relative ?? existing.coverPath,
-        filePath: data.isDigital
-          ? (fileUpload?.relative ?? existing.filePath)
-          : null,
-        fileName: data.isDigital
-          ? (fileUpload?.originalName ?? existing.fileName)
-          : null,
+        coverPath: coverPath ?? existing.coverPath,
+        filePath: data.isDigital ? (filePath ?? existing.filePath) : null,
+        fileName: data.isDigital ? (fileName ?? existing.fileName) : null,
       },
     });
 
-    if (coverUpload && existing.coverPath) await removeUpload(existing.coverPath);
-    if (fileUpload && existing.filePath) await removeUpload(existing.filePath);
+    if (coverPath && existing.coverPath) await removeUpload(existing.coverPath);
+    if (filePath && existing.filePath) await removeUpload(existing.filePath);
     if (!data.isDigital && existing.filePath) await removeUpload(existing.filePath);
   } catch (error) {
     return { error: error instanceof Error ? error.message : "Could not update product." };
